@@ -14,19 +14,20 @@ export class UIRenderer {
     if (state.phase === GamePhase.Menu) return;
 
     // ── 1. Top Viewport "Tokenmaxxing" & Productivity HUD ──
-    const hudW = Math.min(screenWidth - 40 * scale, 720 * scale);
-    const hudH = 42 * scale;
+    const isMobileWidth = screenWidth < 500;
+    const hudW = Math.min(screenWidth - (isMobileWidth ? 16 : 40) * scale, 720 * scale);
+    const hudH = (isMobileWidth ? 38 : 42) * scale;
     const hudX = (screenWidth - hudW) / 2;
-    const hudY = 12 * scale;
+    const hudY = (isMobileWidth ? 8 : 12) * scale;
 
     ctx.save();
 
     // Backdrop Pill
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
     ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
-    ctx.shadowBlur = 14 * scale;
+    ctx.shadowBlur = 12 * scale;
     ctx.beginPath();
-    ctx.roundRect(hudX, hudY, hudW, hudH, 21 * scale);
+    ctx.roundRect(hudX, hudY, hudW, hudH, hudH / 2);
     ctx.fill();
 
     ctx.strokeStyle = '#E2E8F0';
@@ -39,50 +40,54 @@ export class UIRenderer {
     const gaugeColor = prodPercent >= 80 ? '#059669' : prodPercent >= 45 ? '#D97706' : '#E11D48';
 
     ctx.fillStyle = gaugeColor;
-    ctx.font = `bold ${12.5 * scale}px "Google Sans", sans-serif`;
+    ctx.font = `bold ${isMobileWidth ? 11 * scale : 12.5 * scale}px "Google Sans", sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${prodPercent}% PRODUCTIVITY`, hudX + 22 * scale, hudY + hudH / 2);
+    const prodLabel = isMobileWidth ? `${prodPercent}% PROD` : `${prodPercent}% PRODUCTIVITY`;
+    ctx.fillText(prodLabel, hudX + (isMobileWidth ? 12 : 22) * scale, hudY + hudH / 2);
 
-    // Productivity mini progress bar
-    const barW = 110 * scale;
-    const barH = 7 * scale;
-    const barX = hudX + 175 * scale;
-    const barY = hudY + (hudH - barH) / 2;
+    // Productivity mini progress bar (desktop / tablet only)
+    if (hudW > 480 * scale) {
+      const barW = 100 * scale;
+      const barH = 7 * scale;
+      const barX = hudX + 175 * scale;
+      const barY = hudY + (hudH - barH) / 2;
 
-    ctx.fillStyle = '#E2E8F0';
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barW, barH, 3.5 * scale);
-    ctx.fill();
+      ctx.fillStyle = '#E2E8F0';
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW, barH, 3.5 * scale);
+      ctx.fill();
 
-    ctx.fillStyle = gaugeColor;
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barW * (prodPercent / 100), barH, 3.5 * scale);
-    ctx.fill();
+      ctx.fillStyle = gaugeColor;
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW * (prodPercent / 100), barH, 3.5 * scale);
+      ctx.fill();
+    }
 
     // ── Right: Tokenmaxxing Counter & Pause Button ──
-    ctx.fillStyle = '#B45309';
-    ctx.font = `bold ${12 * scale}px "Google Sans", sans-serif`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${state.totalTokensMaxxed.toLocaleString()} MAXXED`, hudX + hudW - 85 * scale, hudY + hudH / 2);
-
-    // Pause Pill Button
-    const pBtnW = 68 * scale;
-    const pBtnH = 26 * scale;
-    const pBtnX = hudX + hudW - 76 * scale;
+    const pBtnW = (isMobileWidth ? 54 : 68) * scale;
+    const pBtnH = (isMobileWidth ? 24 : 26) * scale;
+    const pBtnX = hudX + hudW - (pBtnW + (isMobileWidth ? 6 : 8) * scale);
     const pBtnY = hudY + (hudH - pBtnH) / 2;
 
+    ctx.fillStyle = '#B45309';
+    ctx.font = `bold ${isMobileWidth ? 10.5 * scale : 12 * scale}px "Google Sans", sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    const maxText = isMobileWidth ? `${state.totalTokensMaxxed.toLocaleString()}` : `${state.totalTokensMaxxed.toLocaleString()} MAXXED`;
+    ctx.fillText(maxText, pBtnX - (isMobileWidth ? 6 : 10) * scale, hudY + hudH / 2);
+
+    // Pause Pill Button
     ctx.fillStyle = state.phase === GamePhase.Paused ? '#ECFDF5' : '#F1F5F9';
     ctx.beginPath();
-    ctx.roundRect(pBtnX, pBtnY, pBtnW, pBtnH, 13 * scale);
+    ctx.roundRect(pBtnX, pBtnY, pBtnW, pBtnH, pBtnH / 2);
     ctx.fill();
     ctx.strokeStyle = state.phase === GamePhase.Paused ? '#10B981' : '#CBD5E1';
     ctx.lineWidth = 1.2 * scale;
     ctx.stroke();
 
     ctx.fillStyle = state.phase === GamePhase.Paused ? '#065F46' : '#475569';
-    ctx.font = `bold ${10.5 * scale}px "Google Sans", sans-serif`;
+    ctx.font = `bold ${isMobileWidth ? 9.5 * scale : 10.5 * scale}px "Google Sans", sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText(state.phase === GamePhase.Paused ? 'Resume' : 'Pause', pBtnX + pBtnW / 2, pBtnY + pBtnH / 2 + 0.5 * scale);
 

@@ -29,7 +29,7 @@ export class CanvasRenderer {
     this.canvas.style.width = `${targetW}px`;
     this.canvas.style.height = `${targetH}px`;
 
-    this.scale = Math.min(targetW / V2_CONSTANTS.CANVAS_WIDTH, 1.25);
+    this.scale = Math.min(Math.max(targetW / 780, 0.72), 1.25);
   }
 
   beginFrame(screenShake: number = 0): void {

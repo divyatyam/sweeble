@@ -101,35 +101,37 @@ export class TrackRenderer {
           ctx.fill();
 
           // Left Gold Token Coin Vector Icon
-          const coinX = cardLeft + 16 * scale;
+          const isCompact = cardW < 85 * scale;
+          const coinR = (isCompact ? 5.5 : 7.5) * scale;
+          const coinX = cardLeft + (isCompact ? 10 : 16) * scale;
           const coinY = itemScreenY + cardH / 2;
-          const coinR = 7.5 * scale;
           ctx.fillStyle = '#D97706';
           ctx.beginPath();
           ctx.arc(coinX, coinY, coinR, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = '#FEF08A';
           ctx.beginPath();
-          ctx.arc(coinX, coinY, coinR - 1.8 * scale, 0, Math.PI * 2);
+          ctx.arc(coinX, coinY, coinR - 1.5 * scale, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = '#92400E';
-          ctx.font = `800 ${8 * scale}px "Google Sans", sans-serif`;
+          ctx.font = `800 ${isCompact ? 6 : 8 * scale}px "Google Sans", sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('C', coinX, coinY + 0.5 * scale);
 
           // Exciting Bold Label
           ctx.fillStyle = '#78350F';
-          ctx.font = `800 ${11 * scale}px "Google Sans", sans-serif`;
+          const computeText = isCompact ? '+25' : '+25 COMPUTE';
+          ctx.font = `800 ${isCompact ? 9 : 11 * scale}px "Google Sans", sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('+25 COMPUTE', cardLeft + cardW / 2 + 7 * scale, itemScreenY + cardH / 2);
+          ctx.fillText(computeText, cardLeft + cardW / 2 + (isCompact ? 4 : 7) * scale, itemScreenY + cardH / 2);
 
           // Sparkle Glints on Card Corners
           ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
-          ctx.arc(cardLeft + cardW - 10 * scale, itemScreenY + 7 * scale, 2 * scale, 0, Math.PI * 2);
-          ctx.arc(cardLeft + 28 * scale, itemScreenY + cardH - 7 * scale, 1.5 * scale, 0, Math.PI * 2);
+          ctx.arc(cardLeft + cardW - 8 * scale, itemScreenY + 6 * scale, 1.8 * scale, 0, Math.PI * 2);
+          ctx.arc(cardLeft + 22 * scale, itemScreenY + cardH - 6 * scale, 1.4 * scale, 0, Math.PI * 2);
           ctx.fill();
         } else {
           // Standard Card Fill for Other Items
@@ -165,13 +167,13 @@ export class TrackRenderer {
           ctx.fillStyle = isDarkText ? '#1E293B' : '#FFFFFF';
 
           const label = item.title;
-          let fontSize = 9.5 * scale;
+          let fontSize = (cardW < 80 * scale ? 8 : 9.5) * scale;
           ctx.font = `bold ${fontSize}px "Google Sans", sans-serif`;
           let textWidth = ctx.measureText(label).width;
-          const maxTextW = cardW - 12 * scale;
+          const maxTextW = cardW - 10 * scale;
 
           if (textWidth > maxTextW) {
-            fontSize = Math.max(6.5 * scale, fontSize * (maxTextW / textWidth));
+            fontSize = Math.max(6 * scale, fontSize * (maxTextW / textWidth));
             ctx.font = `bold ${fontSize}px "Google Sans", sans-serif`;
           }
 
@@ -194,38 +196,43 @@ export class TrackRenderer {
       ctx.lineWidth = 1.5 * scale;
       ctx.strokeRect(bounds.left, topHudOffset, bounds.laneWidth, headerHeight);
 
+      const isNarrowLane = bounds.laneWidth < 90 * scale;
+
       // Mascot Name (Left)
       ctx.fillStyle = def.theme.badgeText;
-      ctx.font = `bold ${10.5 * scale}px "Google Sans", sans-serif`;
+      ctx.font = `bold ${Math.min(10.5, bounds.laneWidth * 0.13) * scale}px "Google Sans", sans-serif`;
       ctx.textAlign = 'left';
-      ctx.fillText(`${def.roleName}`, bounds.left + 8 * scale, topHudOffset + 18 * scale);
+      ctx.fillText(`${def.shortName}`, bounds.left + 6 * scale, topHudOffset + 18 * scale);
 
       // Agent Token Count (Right)
       const agentTokens = track.agent && track.agent.alive ? Math.round(track.agent.tokens) : 0;
       const tokenRatio = Math.max(0, Math.min(1.0, agentTokens / 100));
 
       ctx.textAlign = 'right';
-      ctx.font = `bold ${10.5 * scale}px "Google Sans", sans-serif`;
+      ctx.font = `bold ${Math.min(10.5, bounds.laneWidth * 0.13) * scale}px "Google Sans", sans-serif`;
       ctx.fillStyle = track.agent && track.agent.alive
         ? (tokenRatio > 0.40 ? '#059669' : tokenRatio > 0.20 ? '#D97706' : '#DC2626')
         : '#94A3B8';
-      ctx.fillText(track.agent && track.agent.alive ? `${agentTokens} Tokens` : 'Sleeping', bounds.right - 8 * scale, topHudOffset + 18 * scale);
+      const tokenText = track.agent && track.agent.alive
+        ? (isNarrowLane ? `${agentTokens}T` : `${agentTokens} Tokens`)
+        : (isNarrowLane ? 'Zzz' : 'Sleeping');
+      ctx.fillText(tokenText, bounds.right - 6 * scale, topHudOffset + 18 * scale);
 
       // Independent 5-Day / Sleep Timeline Status (Center)
       ctx.font = `bold ${8.5 * scale}px "Google Sans", sans-serif`;
       const dayLabel = track.isComplete
-        ? 'Week Complete'
+        ? (isNarrowLane ? 'Done' : 'Week Complete')
         : (allowSleeps
-            ? `Day ${track.dayNumber}/5 • Sleep ${track.sleepCount}/5`
-            : `Day ${track.dayNumber}/5`);
+            ? (isNarrowLane ? `D${track.dayNumber}•S${track.sleepCount}` : `Day ${track.dayNumber}/5 • Sleep ${track.sleepCount}/5`)
+            : (isNarrowLane ? `D${track.dayNumber}/5` : `Day ${track.dayNumber}/5`));
       ctx.fillStyle = track.isComplete ? '#059669' : '#64748B';
       ctx.textAlign = 'center';
       ctx.fillText(dayLabel, bounds.centerX, topHudOffset + 33 * scale);
 
       // Micro Progress Bar for 5-Day Cycle
-      const pBarW = bounds.laneWidth - 18 * scale;
+      const pBarW = bounds.laneWidth - 14 * scale;
       const pBarH = 4 * scale;
-      const pBarX = bounds.left + 9 * scale;
+      const pBarX = bounds.left + 7 * scale;
       const pBarY = topHudOffset + 43 * scale;
 
       ctx.fillStyle = 'rgba(15, 23, 42, 0.15)';

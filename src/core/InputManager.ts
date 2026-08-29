@@ -1,5 +1,5 @@
 import { GameState } from './GameState';
-import { TrackState, ItemType } from '../types';
+import { TrackState } from '../types';
 
 export class InputManager {
   private keyState: Set<string> = new Set();
@@ -68,7 +68,7 @@ export class InputManager {
       this.keyState.delete(e.key.toLowerCase());
     });
 
-    // Pointer / Mouse Click on Canvas
+    // Touch & Pointer on Canvas with zero-latency handling
     this.canvas.addEventListener('pointerdown', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -76,43 +76,51 @@ export class InputManager {
 
       this.handleCanvasClick(clickX, clickY);
     });
+
+    this.canvas.addEventListener('touchstart', (e) => {
+      // Prevent default scrolling on game canvas
+      if (e.target === this.canvas) {
+        e.preventDefault();
+      }
+    }, { passive: false });
   }
 
   /**
-   * Handles click anywhere on the canvas:
+   * Handles touch/click anywhere on the canvas:
    * 1. If clicking pause/resume button in HUD -> toggle pause!
-   * 2. If paused and clicking resume button -> resume!
-   * 3. If paused and clicking quit button -> quit to main menu!
-   * 4. If clicking a solid color recruitment block -> instantiates/hires that agent!
-   * 5. If clicking on an active agent or its lane -> triggers a leap jump!
+   * 2. If paused -> Resume or Quit
+   * 3. If Game Over or Week Complete -> Retry or Quit
+   * 4. If in game -> tap sleeping lane to Power Up, tap active lane to Jump!
    */
   private handleCanvasClick(clickX: number, clickY: number): void {
     const rect = this.canvas.getBoundingClientRect();
     const cssWidth = rect.width;
-    const scale = Math.min(cssWidth / 960, 1.25);
+    const isMobile = cssWidth < 500;
+    const scale = Math.min(Math.max(cssWidth / 780, 0.72), 1.25);
 
-    const hudW = Math.min(cssWidth - 40 * scale, 720 * scale);
-    const hudH = 42 * scale;
+    const hudW = Math.min(cssWidth - (isMobile ? 16 : 40) * scale, 720 * scale);
+    const hudH = (isMobile ? 38 : 42) * scale;
     const hudX = (cssWidth - hudW) / 2;
-    const hudY = 12 * scale;
+    const hudY = (isMobile ? 8 : 12) * scale;
 
-    const pBtnW = 76 * scale;
-    const pBtnH = 30 * scale;
-    const pBtnX = hudX + hudW - 80 * scale;
+    const pBtnW = (isMobile ? 54 : 68) * scale;
+    const pBtnH = (isMobile ? 24 : 26) * scale;
+    const pBtnX = hudX + hudW - (pBtnW + (isMobile ? 6 : 8) * scale);
     const pBtnY = hudY + (hudH - pBtnH) / 2;
 
-    // Check click on top HUD Pause/Resume button
+    // 1. Check click on top HUD Pause/Resume button
     if (
-      clickX >= pBtnX - 12 &&
-      clickX <= pBtnX + pBtnW + 12 &&
-      clickY >= pBtnY - 8 &&
-      clickY <= pBtnY + pBtnH + 8
+      clickX >= pBtnX - 14 &&
+      clickX <= pBtnX + pBtnW + 14 &&
+      clickY >= pBtnY - 10 &&
+      clickY <= pBtnY + pBtnH + 10
     ) {
       this.state.togglePause();
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
       return;
     }
 
-    // If Paused: Check click on Resume / Quit buttons
+    // 2. If Paused: Check click on Resume / Quit buttons
     if (this.state.phase === 'paused') {
       const mY = 180 * scale;
       const btnW = 240 * scale;
@@ -147,6 +155,37 @@ export class InputManager {
       return;
     }
 
+    // 3. If Game Over: Check Retry or Quit
+    if (this.state.phase === 'gameover') {
+      const mW = Math.min(cssWidth - 40 * scale, 480 * scale);
+      const mX = (cssWidth - mW) / 2;
+      const mY = 130 * scale;
+      const btnW = mW - 48 * scale;
+      const btnH = 42 * scale;
+      const btnX = mX + 24 * scale;
+
+      const quitY = mY + 268 * scale;
+
+      // Click Quit
+      if (clickX >= btnX && clickX <= btnX + btnW && clickY >= quitY && clickY <= quitY + btnH) {
+        this.onQuit?.();
+        return;
+      }
+
+      // Otherwise Retry
+      this.state.reset(this.state.unlockedLevel);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
+      return;
+    }
+
+    // 4. If Week Complete: Click anywhere restarts
+    if (this.state.phase === 'week_complete') {
+      this.state.reset(this.state.unlockedLevel);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
+      return;
+    }
+
+    // 5. In-Game Lane Tap: Power Up or Jump
     const unlockedTracks = this.state.getUnlockedTracks();
 
     for (const track of unlockedTracks) {
@@ -157,41 +196,22 @@ export class InputManager {
         const hasActiveAgent = track.agent !== null && track.agent.alive;
 
         if (!hasActiveAgent) {
-          // Check if clicking near any recruitment color block
-          const clickedItem = this.findClickedRecruiterBlock(track, clickY);
-          if (clickedItem) {
-            this.recruitAgentForTrack(track, bounds.centerX, clickY);
-            return;
+          // Sleeping agent -> Power Up / Awaken!
+          this.recruitAgentForTrack(track, bounds.centerX, clickY);
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(15);
           }
-
-          // Also allow clicking anywhere in the empty lane to hire if a color block is visible
-          if (track.items.some(item => item.type === ItemType.ColorBlock && !item.collected)) {
-            this.recruitAgentForTrack(track, bounds.centerX, clickY);
-            return;
-          }
+          return;
         } else {
-          // Track has active agent -> Trigger JUMP!
+          // Active agent -> Leap Jump!
           this.handleTrackJumpAction(track.index);
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(10);
+          }
           return;
         }
       }
     }
-  }
-
-  private findClickedRecruiterBlock(track: TrackState, clickY: number): boolean {
-    const screenH = this.canvas.height;
-    const agentY = screenH * 0.78;
-
-    for (const item of track.items) {
-      if (item.type === ItemType.ColorBlock && !item.collected) {
-        const itemScreenY = item.positionY + track.distanceTraveledPx;
-        if (Math.abs(clickY - itemScreenY) < 90 || Math.abs(clickY - agentY) < 110) {
-          item.collected = true;
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   private recruitAgentForTrack(track: TrackState, centerX: number, clickY: number): void {
